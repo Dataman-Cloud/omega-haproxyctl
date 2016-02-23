@@ -19,14 +19,14 @@ import (
 /*
 	Commandline arguments
 */
-//var configFilePath string
 var logPath string
 var serverBindPort string
+var ValidateFailed bool
 
 func init() {
 	//	flag.StringVar(&configFilePath, "config", "config/development.json", "Full path of the configuration JSON file")
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
-	flag.StringVar(&serverBindPort, "bind", ":5094", "Bind HTTP server to a specific port")
+	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
 }
 
 type Response struct {
@@ -67,16 +67,20 @@ func initServer(conf *configuration.Configuration) {
 	// API
 	router.Group("/api", func(api martini.Router) {
 		// State API
-		api.Get("/state", handleStatus)
+		api.Get("/status", HealthCheck)
 		// Service API
-		api.Get("/services", servicesApi)
+		api.Put("/haproxy", servicesApi)
 	})
 
 	router.RunOnAddr(serverBindPort)
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "OK")
+func HealthCheck(w http.ResponseWriter, r *http.Request) {
+	if ValidateFailed {
+		http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, "Successed to validate haproxy.cfg")
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +92,7 @@ func servicesApi(w http.ResponseWriter, r *http.Request) {
 	reloaded, err := validateAndUpdateConfig(&conf)
 	if err != nil {
 		response.Err = err.Error()
-		responseJSON(w, response)
+		http.Error(w, "Failed to reload haproxy: ", http.StatusInternalServerError)
 		return
 	}
 
@@ -105,16 +109,19 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	log.Println("Validating config")
 	err = execCommand(conf.HAProxy.ReloadValidationCommand)
 	if err != nil {
+		ValidateFailed = true
 		return
 	}
 
 	log.Println("Reload config")
 	err = execCommand(conf.HAProxy.ReloadCommand)
 	if err != nil {
+		ValidateFailed = true
 		return
 	}
 
 	reloaded = true
+	ValidateFailed = false
 	return
 }
 

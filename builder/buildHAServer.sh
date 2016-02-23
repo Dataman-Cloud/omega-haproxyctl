@@ -8,8 +8,8 @@ export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 cd /gopath/src/github.com/Dataman-Cloud/HAServer
 go get github.com/tools/godep && \
 go build && \
-mkdir /var/HAServer && \
-cp  /gopath/src/github.com/Dataman-Cloud/HAServer /var/haserver/HAServer && \
+mkdir -p /var/haserver && \
+cp /gopath/src/github.com/Dataman-Cloud/HAServer/HAServer /var/haserver/HAServer && \
 mkdir -p /run/haproxy && \
 mkdir -p /var/log/supervisor &&\
 cd /

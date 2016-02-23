@@ -35,7 +35,7 @@ type HAProxy struct {
 
 func init() {
 	log.Println("initialized config")
-	flag.StringVar(&configFilePath, "config", "config/development.json", "Full path of the configuration JSON file")
+	flag.StringVar(&configFilePath, "config", "config/production.gateway.json", "Full path of the configuration JSON file")
 	err := FromFile(configFilePath, &conf)
 	if err != nil {
 		log.Fatal(err)
