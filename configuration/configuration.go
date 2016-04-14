@@ -31,6 +31,8 @@ type HAProxy struct {
 	ReloadCommand           string
 	ReloadValidationCommand string
 	ReloadCleanupCommand    string
+	SockFile                string
+	Command                 string
 }
 
 func init() {
@@ -40,6 +42,8 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	conf.HAProxy.SockFile = "/run/haproxy/admin.sock"
+	conf.HAProxy.Command = "haproxy"
 }
 
 func (config *Configuration) FromFile(filePath string) error {

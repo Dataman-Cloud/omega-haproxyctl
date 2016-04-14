@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/go-martini/martini"
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/natefinch/lumberjack"
+	"github.com/Dataman-Cloud/HAServer/cmd"
 	"github.com/Dataman-Cloud/HAServer/configuration"
 )
 
@@ -22,6 +24,7 @@ import (
 var logPath string
 var serverBindPort string
 var ValidateFailed bool
+var runtime cmd.Runtime
 
 func init() {
 	//	flag.StringVar(&configFilePath, "config", "config/development.json", "Full path of the configuration JSON file")
@@ -40,6 +43,10 @@ func main() {
 
 	// Load configuration
 	conf := configuration.Configs()
+	runtime = cmd.Runtime{
+		Binary:   conf.HAProxy.Command,
+		SockFile: conf.HAProxy.SockFile,
+	}
 
 	// Wait for died children to avoid zombies
 	signalChannel := make(chan os.Signal, 2)
@@ -70,6 +77,8 @@ func initServer(conf *configuration.Configuration) {
 		api.Get("/status", HealthCheck)
 		// Service API
 		api.Put("/haproxy", servicesApi)
+		// Weight API
+		api.Put("/weight", updateWeight)
 	})
 
 	router.RunOnAddr(serverBindPort)
@@ -81,6 +90,38 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	io.WriteString(w, "Successed to validate haproxy.cfg")
+}
+
+func updateWeight(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	params := struct {
+		Backend string `json:"backend"`
+		Server  string `json:"server"`
+		Weight  int    `json:"weight"`
+	}{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Println("Error: cannot parse server weight", err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(params.Backend)&len(params.Server) == 0 {
+		errMsg := fmt.Sprintf("Error: bad params %s %s ", params.Backend, params.Server)
+		log.Println(errMsg)
+		http.Error(w, errMsg, http.StatusBadRequest)
+		return
+	}
+	log.Println("setting weight", params.Backend, params.Server, params.Weight)
+
+	out, err := runtime.SetWeight(params.Backend, params.Server, params.Weight)
+	if err != nil {
+		log.Println("Error: cannot set server weight", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Println("set weight", out)
+
+	responseJSON(w, Response{Code: 0})
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
