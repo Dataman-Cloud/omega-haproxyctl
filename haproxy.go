@@ -95,9 +95,11 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 func updateWeight(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := struct {
-		Backend string `json:"backend"`
-		Server  string `json:"server"`
-		Weight  int    `json:"weight"`
+		ID       string `param:"id" json:"id"`
+		Versions []struct {
+			ID    string `param:"id" json:"id"`
+			Value int    `param:"weight" json:"weight"`
+		}
 	}{}
 	err := decoder.Decode(&params)
 	if err != nil {
@@ -105,21 +107,23 @@ func updateWeight(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if len(params.Backend)&len(params.Server) == 0 {
-		errMsg := fmt.Sprintf("Error: bad params %s %s ", params.Backend, params.Server)
+	if len(params.ID)&len(params.Versions) == 0 {
+		errMsg := fmt.Sprintf("Error: bad params %s %s ", params.ID, params.Versions)
 		log.Println(errMsg)
 		http.Error(w, errMsg, http.StatusBadRequest)
 		return
 	}
-	log.Println("setting weight", params.Backend, params.Server, params.Weight)
 
-	out, err := runtime.SetWeight(params.Backend, params.Server, params.Weight)
-	if err != nil {
-		log.Println("Error: cannot set server weight", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	for _, version := range params.Versions {
+		log.Println("setting weight", params.ID, version.ID, version.Value)
+		out, err := runtime.SetWeight(params.ID, version.ID, version.Value)
+		if err != nil {
+			log.Println("Error: cannot set server weight", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("set weight", out)
 	}
-	log.Println("set weight", out)
 
 	responseJSON(w, Response{Code: 0})
 }
