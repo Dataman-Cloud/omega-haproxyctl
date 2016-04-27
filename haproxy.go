@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,7 +26,6 @@ var ValidateFailed bool
 var runtime cmd.Runtime
 
 func init() {
-	//	flag.StringVar(&configFilePath, "config", "config/development.json", "Full path of the configuration JSON file")
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
 	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
 }
@@ -93,30 +91,29 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateWeight(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	params := struct {
-		ID       string `param:"id" json:"id"`
-		Versions []struct {
-			ID    string `param:"id" json:"id"`
-			Value int    `param:"weight" json:"weight"`
-		}
+	servers := []struct {
+		Frontend string `param:"frontend" json:"frontend"`
+		Server   string `param:"server" json:"server"`
+		Weight   int    `param:"weight" json:"weight"`
 	}{}
-	err := decoder.Decode(&params)
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	err := decoder.Decode(&servers)
 	if err != nil {
 		log.Println("Error: cannot parse server weight", err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if len(params.ID)&len(params.Versions) == 0 {
-		errMsg := fmt.Sprintf("Error: bad params %s %s ", params.ID, params.Versions)
-		log.Println(errMsg)
-		http.Error(w, errMsg, http.StatusBadRequest)
+
+	if len(servers) == 0 {
+		log.Println("empty servers")
+		responseJSON(w, Response{Code: 0})
 		return
 	}
 
-	for _, version := range params.Versions {
-		log.Println("setting weight", params.ID, version.ID, version.Value)
-		out, err := runtime.SetWeight(params.ID, version.ID, version.Value)
+	for _, server := range servers {
+		log.Println("setting weight", server.Frontend, server.Server, server.Weight)
+		out, err := runtime.SetWeight(server.Frontend, server.Server, server.Weight)
 		if err != nil {
 			log.Println("Error: cannot set server weight", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -158,15 +155,27 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 		return
 	}
 
+	log.Println("Before reload")
+	err = execCommand(conf.HAProxy.BeforeReload)
+	if err != nil {
+		log.Println("WARN:", err.Error)
+	}
+
 	log.Println("Reload config")
 	err = execCommand(conf.HAProxy.ReloadCommand)
 	if err != nil {
 		ValidateFailed = true
 		return
 	}
-
 	reloaded = true
 	ValidateFailed = false
+
+	log.Println("After reload")
+	err = execCommand(conf.HAProxy.AfterReload)
+	if err != nil {
+		log.Println("WARN:", err.Error)
+	}
+
 	return
 }
 

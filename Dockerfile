@@ -3,8 +3,7 @@ MAINTAINER lhan <lhan@dataman-inc.com>
 
 RUN mkdir -p /config /etc/default_haproxy
 
-ADD config/production.gateway.json /config/production.gateway.json
-ADD config/production.example.json /config/production.example.json
+ADD config/production.json /config/production.json
 ADD config/default_haproxy.cfg /etc/default_haproxy/default_haproxy.cfg
 
 ADD . /gopath/src/github.com/Dataman-Cloud/HAServer

@@ -26,9 +26,9 @@ type Configuration struct {
 }
 
 type HAProxy struct {
-	TemplatePath            string
-	OutputPath              string
+	BeforeReload            string
 	ReloadCommand           string
+	AfterReload             string
 	ReloadValidationCommand string
 	ReloadCleanupCommand    string
 	SockFile                string
@@ -37,7 +37,7 @@ type HAProxy struct {
 
 func init() {
 	log.Println("initialized config")
-	flag.StringVar(&configFilePath, "config", "config/production.gateway.json", "Full path of the configuration JSON file")
+	flag.StringVar(&configFilePath, "config", "config/production.json", "Full path of the configuration JSON file")
 	err := FromFile(configFilePath, &conf)
 	if err != nil {
 		log.Fatal(err)
@@ -56,9 +56,9 @@ func (config *Configuration) FromFile(filePath string) error {
 
 func FromFile(filePath string, conf *Configuration) error {
 	err := conf.FromFile(filePath)
-	setValueFromEnv(&conf.HAProxy.TemplatePath, "HAPROXY_TEMPLATE_PATH")
-	setValueFromEnv(&conf.HAProxy.OutputPath, "HAPROXY_OUTPUT_PATH")
 	setValueFromEnv(&conf.HAProxy.ReloadCommand, "HAPROXY_RELOAD_CMD")
+	setValueFromEnv(&conf.HAProxy.BeforeReload, "HAPROXY_BEFORE_RELOAD_CMD")
+	setValueFromEnv(&conf.HAProxy.AfterReload, "HAPROXY_AFTER_RELOAD_CMD")
 	setValueFromEnv(&conf.HAProxy.ReloadValidationCommand, "HAPROXY_RELOAD_VALIDATION_CMD")
 	setValueFromEnv(&conf.HAProxy.ReloadCleanupCommand, "HAPROXY_RELOAD_CLEANUP_CMD")
 
