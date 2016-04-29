@@ -1,8 +1,8 @@
 {
   "HAProxy": {
-    "TemplatePath": "config/haproxy_template.gateway.cfg",
-    "OutputPath": "/etc/haproxy/haproxy.cfg",
+    "BeforeReload": "iptables -I INPUT -p tcp --syn -j DROP",
     "ReloadCommand": "haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -D -sf $(cat /var/run/haproxy.pid)",
+    "AfterReload": "iptables -D INPUT -p tcp  --syn -j DROP",
     "ReloadValidationCommand": "haproxy -c -f /etc/haproxy/haproxy.cfg"
   }
 }

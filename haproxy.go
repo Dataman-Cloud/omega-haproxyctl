@@ -13,6 +13,7 @@ import (
 
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/go-martini/martini"
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/natefinch/lumberjack"
+	"github.com/Dataman-Cloud/HAServer/cmd"
 	"github.com/Dataman-Cloud/HAServer/configuration"
 )
 
@@ -22,9 +23,9 @@ import (
 var logPath string
 var serverBindPort string
 var ValidateFailed bool
+var runtime cmd.Runtime
 
 func init() {
-	//	flag.StringVar(&configFilePath, "config", "config/development.json", "Full path of the configuration JSON file")
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
 	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
 }
@@ -40,6 +41,10 @@ func main() {
 
 	// Load configuration
 	conf := configuration.Configs()
+	runtime = cmd.Runtime{
+		Binary:   conf.HAProxy.Command,
+		SockFile: conf.HAProxy.SockFile,
+	}
 
 	// Wait for died children to avoid zombies
 	signalChannel := make(chan os.Signal, 2)
@@ -70,6 +75,8 @@ func initServer(conf *configuration.Configuration) {
 		api.Get("/status", HealthCheck)
 		// Service API
 		api.Put("/haproxy", servicesApi)
+		// Weight API
+		api.Put("/weight", updateWeight)
 	})
 
 	router.RunOnAddr(serverBindPort)
@@ -79,8 +86,44 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	if ValidateFailed {
 		http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
 		return
+	} else {
+		io.WriteString(w, "Successed to validate haproxy.cfg")
 	}
-	io.WriteString(w, "Successed to validate haproxy.cfg")
+}
+
+func updateWeight(w http.ResponseWriter, r *http.Request) {
+	servers := []struct {
+		Backend string `param:"backend" json:"backend"`
+		Server  string `param:"server" json:"server"`
+		Weight  int    `param:"weight" json:"weight"`
+	}{}
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	err := decoder.Decode(&servers)
+	if err != nil {
+		log.Println("Error: cannot parse server weight", err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(servers) == 0 {
+		log.Println("empty servers")
+		responseJSON(w, Response{Code: 0})
+		return
+	}
+
+	for _, server := range servers {
+		log.Println("setting weight", server.Backend, server.Server, server.Weight)
+		out, err := runtime.SetWeight(server.Backend, server.Server, server.Weight)
+		if err != nil {
+			log.Println("Error: cannot set server weight", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("set weight", out)
+	}
+
+	responseJSON(w, Response{Code: 0})
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
@@ -113,15 +156,27 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 		return
 	}
 
+	log.Println("Before reload")
+	err = execCommand(conf.HAProxy.BeforeReload)
+	if err != nil {
+		log.Println("WARN:", err.Error)
+	}
+
 	log.Println("Reload config")
 	err = execCommand(conf.HAProxy.ReloadCommand)
 	if err != nil {
 		ValidateFailed = true
 		return
 	}
-
 	reloaded = true
 	ValidateFailed = false
+
+	log.Println("After reload")
+	err = execCommand(conf.HAProxy.AfterReload)
+	if err != nil {
+		log.Println("WARN:", err.Error)
+	}
+
 	return
 }
 

@@ -7,7 +7,7 @@ export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 cd /gopath/src/github.com/Dataman-Cloud/HAServer
 go get github.com/tools/godep && \
-go build && \
+go build -o HAServer && \
 mkdir -p /var/haserver && \
 cp /gopath/src/github.com/Dataman-Cloud/HAServer/HAServer /var/haserver/HAServer && \
 mkdir -p /run/haproxy && \
