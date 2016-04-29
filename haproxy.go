@@ -86,15 +86,16 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	if ValidateFailed {
 		http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
 		return
+	} else {
+		io.WriteString(w, "Successed to validate haproxy.cfg")
 	}
-	io.WriteString(w, "Successed to validate haproxy.cfg")
 }
 
 func updateWeight(w http.ResponseWriter, r *http.Request) {
 	servers := []struct {
-		Frontend string `param:"frontend" json:"frontend"`
-		Server   string `param:"server" json:"server"`
-		Weight   int    `param:"weight" json:"weight"`
+		Backend string `param:"backend" json:"backend"`
+		Server  string `param:"server" json:"server"`
+		Weight  int    `param:"weight" json:"weight"`
 	}{}
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -112,8 +113,8 @@ func updateWeight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, server := range servers {
-		log.Println("setting weight", server.Frontend, server.Server, server.Weight)
-		out, err := runtime.SetWeight(server.Frontend, server.Server, server.Weight)
+		log.Println("setting weight", server.Backend, server.Server, server.Weight)
+		out, err := runtime.SetWeight(server.Backend, server.Server, server.Weight)
 		if err != nil {
 			log.Println("Error: cannot set server weight", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)

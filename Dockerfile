@@ -15,6 +15,6 @@ WORKDIR /
 
 RUN sh /buildHAServer.sh
 
-EXPOSE 80 5004 5091
+EXPOSE 5004 5091
 
 CMD sh /run.sh   
