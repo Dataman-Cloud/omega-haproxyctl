@@ -84,11 +84,15 @@ func initServer(conf *configuration.Configuration) {
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	if ValidateFailed {
-		http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
-		return
-	} else {
-		io.WriteString(w, "Successed to validate haproxy.cfg")
+		conf := configuration.Configs()
+		if _, err := validateAndUpdateConfig(&conf); err != nil {
+			http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
+			return
+		}
 	}
+
+	io.WriteString(w, "Successed to validate haproxy.cfg")
+	return
 }
 
 func updateWeight(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +157,7 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	err = execCommand(conf.HAProxy.ReloadValidationCommand)
 	if err != nil {
 		ValidateFailed = true
+		log.Println("Error: ", err.Error)
 		return
 	}
 
