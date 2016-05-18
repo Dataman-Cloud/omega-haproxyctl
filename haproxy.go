@@ -157,20 +157,21 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	err = execCommand(conf.HAProxy.ReloadValidationCommand)
 	if err != nil {
 		ValidateFailed = true
-		log.Println("Error: ", err.Error)
+		log.Println("Validat config Error: ", err.Error())
 		return
 	}
 
 	log.Println("Before reload")
 	err = execCommand(conf.HAProxy.BeforeReload)
 	if err != nil {
-		log.Println("WARN:", err.Error)
+		log.Println("WARN:", err.Error())
 	}
 
 	log.Println("Reload config")
 	err = execCommand(conf.HAProxy.ReloadCommand)
 	if err != nil {
 		ValidateFailed = true
+		log.Println("Reload config Error: ", err.Error())
 		return
 	}
 	reloaded = true
@@ -179,7 +180,7 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	log.Println("After reload")
 	err = execCommand(conf.HAProxy.AfterReload)
 	if err != nil {
-		log.Println("WARN:", err.Error)
+		log.Println("WARN:", err.Error())
 	}
 
 	return
