@@ -162,7 +162,19 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	}
 
 	log.Println("Before reload")
+	// add drop tcp sync message
 	err = execCommand(conf.HAProxy.BeforeReload)
+
+	// delete drop tcp sync message
+	defer func() {
+		log.Println("After reload")
+		err = execCommand(conf.HAProxy.AfterReload)
+		if err != nil {
+			log.Println("WARN:", err.Error())
+		}
+
+	}()
+
 	if err != nil {
 		log.Println("WARN:", err.Error())
 	}
@@ -176,12 +188,6 @@ func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, 
 	}
 	reloaded = true
 	ValidateFailed = false
-
-	log.Println("After reload")
-	err = execCommand(conf.HAProxy.AfterReload)
-	if err != nil {
-		log.Println("WARN:", err.Error())
-	}
 
 	return
 }
