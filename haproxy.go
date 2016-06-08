@@ -24,10 +24,12 @@ var logPath string
 var serverBindPort string
 var ValidateFailed bool
 var runtime cmd.Runtime
+var reloadChan chan int
 
 func init() {
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
 	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
+	reloadChan = make(chan int, 3)
 }
 
 type Response struct {
@@ -67,6 +69,8 @@ func main() {
 }
 
 func initServer(conf *configuration.Configuration) {
+	// begin listen to reload haproxy
+	go ReloadHaproxyConfig(conf)
 	// Status live information
 	router := martini.Classic()
 	// API
@@ -131,25 +135,23 @@ func updateWeight(w http.ResponseWriter, r *http.Request) {
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
-	conf := configuration.Configs()
-	response := Response{
-		Code: 1,
-		Err:  "",
-	}
-	reloaded, err := validateAndUpdateConfig(&conf)
-	if err != nil {
-		response.Err = err.Error()
-		http.Error(w, "Failed to reload haproxy: ", http.StatusInternalServerError)
+	if len(reloadChan) < 3 {
+		reloadChan <- 1
+		responseJSON(w, Response{Code: 0, Err: ""})
 		return
 	}
 
-	if reloaded {
-		log.Println("Update success")
-	} else {
-		log.Println("Update fail")
+	log.Println("HAProxy reload queue is fully, ignore this message")
+	responseJSON(w, Response{Code: 0, Err: "reloading, ignore message"})
+}
+
+func ReloadHaproxyConfig(conf *configuration.Configuration) {
+	for {
+		select {
+		case <-reloadChan:
+			validateAndUpdateConfig(conf)
+		}
 	}
-	response.Code = 0
-	responseJSON(w, response)
 }
 
 func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, err error) {

@@ -1,5 +1,5 @@
 #!/bin/bash
-apk update && apk add curl git bash go supervisor net-tools iptables && rm -rf /var/cache/apk/*
+apk update && apk add curl git bash go haproxy supervisor net-tools iptables && rm -rf /var/cache/apk/*
 export GOROOT=/usr/lib/go
 export GOPATH=/gopath
 export GOBIN=/gopath/bin
