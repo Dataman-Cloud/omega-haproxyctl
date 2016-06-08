@@ -1,4 +1,4 @@
-FROM alpine:3.2
+FROM haproxy:1.6.5-alpine
 MAINTAINER lhan <lhan@dataman-inc.com>
 
 RUN mkdir -p /config /etc/default_haproxy
