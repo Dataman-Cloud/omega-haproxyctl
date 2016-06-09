@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -150,6 +151,7 @@ func ReloadHaproxyConfig(conf *configuration.Configuration) {
 		select {
 		case <-reloadChan:
 			validateAndUpdateConfig(conf)
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
