@@ -6,11 +6,11 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/go-martini/martini"
 	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/natefinch/lumberjack"
@@ -21,11 +21,12 @@ import (
 /*
 	Commandline arguments
 */
-var logPath string
-var serverBindPort string
-var ValidateFailed bool
-var runtime cmd.Runtime
-var reloadChan chan int
+var (
+	logPath        string
+	serverBindPort string
+	runtime        cmd.Runtime
+	reloadChan     chan int
+)
 
 func init() {
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
@@ -88,12 +89,11 @@ func initServer(conf *configuration.Configuration) {
 }
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	if ValidateFailed {
-		conf := configuration.Configs()
-		if _, err := validateAndUpdateConfig(&conf); err != nil {
-			http.Error(w, "Failed to validate haproxy.cfg", http.StatusInternalServerError)
-			return
-		}
+	conf := configuration.Configs()
+	if err := validateConfig(&conf); err != nil {
+		log.Println("validateConfig got error: ", err)
+		http.Error(w, "Failed to validate haproxy config", http.StatusInternalServerError)
+		return
 	}
 
 	io.WriteString(w, "Successed to validate haproxy.cfg")
@@ -150,50 +150,52 @@ func ReloadHaproxyConfig(conf *configuration.Configuration) {
 	for {
 		select {
 		case <-reloadChan:
-			validateAndUpdateConfig(conf)
+			reloadConfig(conf)
 			time.Sleep(time.Second * 1)
 		}
 	}
 }
 
-func validateAndUpdateConfig(conf *configuration.Configuration) (reloaded bool, err error) {
+// validate haproxy config
+func validateConfig(conf *configuration.Configuration) error {
 	log.Println("Validating config")
-	err = execCommand(conf.HAProxy.ReloadValidationCommand)
+	err := execCommand(conf.HAProxy.ReloadValidationCommand)
 	if err != nil {
-		ValidateFailed = true
 		log.Println("Validat config Error: ", err.Error())
-		return
+		return err
+	}
+
+	return nil
+}
+
+// reload and update haproxy config
+func reloadConfig(conf *configuration.Configuration) (bool, error) {
+	// delete drop tcp sync message
+	defer func() {
+		log.Println("After reload")
+		if err := execCommand(conf.HAProxy.AfterReload); err != nil {
+			log.Println("WARN: AfterReload Command got error: ", err.Error())
+		}
+	}()
+
+	err := validateConfig(conf)
+	if err != nil {
+		return false, err
 	}
 
 	log.Println("Before reload")
 	// add drop tcp sync message
-	err = execCommand(conf.HAProxy.BeforeReload)
-
-	// delete drop tcp sync message
-	defer func() {
-		log.Println("After reload")
-		err = execCommand(conf.HAProxy.AfterReload)
-		if err != nil {
-			log.Println("WARN:", err.Error())
-		}
-
-	}()
-
-	if err != nil {
-		log.Println("WARN:", err.Error())
+	if err := execCommand(conf.HAProxy.BeforeReload); err != nil {
+		log.Println("WARN: BeforeReload Command got error: ", err.Error())
 	}
 
 	log.Println("Reload config")
-	err = execCommand(conf.HAProxy.ReloadCommand)
-	if err != nil {
-		ValidateFailed = true
+	if err := execCommand(conf.HAProxy.ReloadCommand); err != nil {
 		log.Println("Reload config Error: ", err.Error())
-		return
+		return false, err
 	}
-	reloaded = true
-	ValidateFailed = false
 
-	return
+	return true, nil
 }
 
 func execCommand(cmd string) error {
