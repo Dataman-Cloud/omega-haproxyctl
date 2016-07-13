@@ -1,4 +1,4 @@
-FROM alpine:3.2
+FROM demoregistry.dataman-inc.com/library/alpine3.3-base:latest
 MAINTAINER lhan <lhan@dataman-inc.com>
 
 RUN mkdir -p /config /etc/default_haproxy
