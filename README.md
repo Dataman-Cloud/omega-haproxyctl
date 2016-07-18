@@ -1,4 +1,23 @@
-#HAServer REST API
+#Omega Haproxy Controller(A.K.A. HAServer) REST API
+
+
+## Introduction
+
+omega-haproxyctl is haproxy configration controller, it keep sry's service
+config can sync update asap.
+
+## Build and Run
+
+Currently project use gvt to manage package dependency.
+
+gvt restore to restore the dependency library.
+
+```bash
+
+# bash build.sh
+
+# bash run.sh
+```
 
 ## API List
   - [GET http://localhost:5004/api/status](#healthCheck)  :healthCheck  检查服务是否正常运行
@@ -20,3 +39,7 @@
 500 or 200
 `
 500表示更新haproxy模板失败，200表示更新haproxy模板成功．
+
+## Reference list:
+1.
+http://engineeringblog.yelp.com/2015/04/true-zero-downtime-haproxy-reloads.html

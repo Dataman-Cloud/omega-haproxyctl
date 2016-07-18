@@ -1,12 +1,20 @@
 #!/bin/bash
-apk update && apk add curl git bash go haproxy supervisor net-tools iptables && rm -rf /var/cache/apk/*
+
+S6_OVERLAY_VERSION=v1.18.1.3
+
+apk update && \
+  apk add  --no-cache libnl3 libnl3-cli git bash go haproxy net-tools wget iptables iproute2 \
+  && wget https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-amd64.tar.gz --no-check-certificate -O /tmp/s6-overlay.tar.gz \
+  && tar xvfz /tmp/s6-overlay.tar.gz -C / \
+  && rm -f /tmp/s6-overlay.tar.gz \
+  && apk del wget
+
 export GOROOT=/usr/lib/go
 export GOPATH=/gopath
 export GOBIN=/gopath/bin
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 cd /gopath/src/github.com/Dataman-Cloud/HAServer
-go get github.com/tools/godep && \
 go build -o HAServer && \
 mkdir -p /var/haserver && \
 cp /gopath/src/github.com/Dataman-Cloud/HAServer/HAServer /var/haserver/HAServer && \
