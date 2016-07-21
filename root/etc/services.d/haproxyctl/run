@@ -1,0 +1,3 @@
+#!/usr/bin/with-contenv sh
+
+/var/haserver/HAServer -bind="${BIND:-:5004}" -config=${CONFIG_PATH:-/config/production.json}

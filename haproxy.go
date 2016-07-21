@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/go-martini/martini"
-	"github.com/Dataman-Cloud/HAServer/Godeps/_workspace/src/github.com/natefinch/lumberjack"
 	"github.com/Dataman-Cloud/HAServer/cmd"
 	"github.com/Dataman-Cloud/HAServer/configuration"
+	"github.com/go-martini/martini"
+	"github.com/natefinch/lumberjack"
 )
 
 /*

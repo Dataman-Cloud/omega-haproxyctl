@@ -1,8 +1,8 @@
 {
   "HAProxy": {
-    "BeforeReload": "iptables -w -I INPUT -p tcp -m multiport --dport 80,443,1025:4999,5101:5999,7000:9999,20001:30999 --syn -j DROP",
+    "BeforeReload": "nl-qdisc-add --dev=lo --parent=1:4 --id=40: --update plug --buffer &> /dev/null",
     "ReloadCommand": "haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -D -sf $(cat /var/run/haproxy.pid)",
-    "AfterReload": "iptables -w -D INPUT -p tcp -m multiport --dport 80,443,1025:4999,5101:5999,7000:9999,20001:30999 --syn -j DROP",
+    "AfterReload": "nl-qdisc-add --dev=lo --parent=1:4 --id=40: --update plug--release-indefinite &> /dev/null",
     "ReloadValidationCommand": "haproxy -c -f /etc/haproxy/haproxy.cfg"
   }
 }
