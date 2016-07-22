@@ -2,6 +2,11 @@
 
 S6_OVERLAY_VERSION=v1.18.1.3
 
+echo "" > /etc/apk/repositories
+echo  http://mirrors.ustc.edu.cn/alpine/v3.4/main/  >>  /etc/apk/repositories
+echo  http://mirrors.ustc.edu.cn/alpine/v3.4/community/  >>  /etc/apk/repositories
+
+
 apk update && \
   apk add  --no-cache libnl3 libnl3-cli git bash go haproxy net-tools wget iptables iproute2 \
   && wget https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-amd64.tar.gz --no-check-certificate -O /tmp/s6-overlay.tar.gz \
