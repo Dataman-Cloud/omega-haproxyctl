@@ -1,4 +1,4 @@
-FROM haproxy:1.5.18-alpine
+FROM catalog.shurenyun.com/library/haproxy:1.5.18-alpine
 MAINTAINER Xiao Deshi <dsxiao@dataman-inc.com>
 
 RUN mkdir -p /config /etc/default_haproxy
