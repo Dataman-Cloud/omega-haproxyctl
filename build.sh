@@ -10,4 +10,4 @@ NAMESPACE="library"
 
 docker build --no-cache -t ${IMAGE}:${VERSION} -f Dockerfile.builder .
 
-docker tag ${IMAGE}:${VERSION} $(HOST)/$(NAMESPACE)/${IMAGE}:omega.${VERSION}
+docker tag ${IMAGE}:${VERSION} ${HOST}/${NAMESPACE}/${IMAGE}:omega.${VERSION}
