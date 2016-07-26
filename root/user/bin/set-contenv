@@ -1,4 +1,6 @@
-f { s6-test $# -eq 2 }
+#!/usr/bin/execlineb -S0
+
+if { s6-test $# -eq 2 }
 
 backtick -in FILENAME {
       pipeline { s6-echo "${1}" }
