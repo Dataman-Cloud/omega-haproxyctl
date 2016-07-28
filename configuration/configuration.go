@@ -2,14 +2,12 @@ package configuration
 
 import (
 	"encoding/json"
-	"flag"
 	"io/ioutil"
 	"log"
 	"os"
 )
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
-var configFilePath string
 
 /*
 	Service configuration struct
@@ -35,9 +33,8 @@ type HAProxy struct {
 	Command                 string
 }
 
-func init() {
+func Init(configFilePath string) {
 	log.Println("initialized config")
-	flag.StringVar(&configFilePath, "config", "/config/production.json", "Full path of the configuration JSON file")
 	err := FromFile(configFilePath, &conf)
 	if err != nil {
 		log.Fatal(err)

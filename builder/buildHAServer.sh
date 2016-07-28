@@ -9,9 +9,8 @@ echo  http://mirrors.ustc.edu.cn/alpine/v3.4/community/  >>  /etc/apk/repositori
 
 apk update && \
   apk add  --no-cache libnl3 libnl3-cli git bash go haproxy net-tools wget iptables iproute2 \
-  && wget https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-amd64.tar.gz --no-check-certificate -O /tmp/s6-overlay.tar.gz \
-  && tar xvfz /tmp/s6-overlay.tar.gz -C / \
-  && rm -f /tmp/s6-overlay.tar.gz \
+  && tar xvfz /tmp/s6-overlay-amd64.tar.gz -C / \
+  && rm -f /tmp/s6-overlay-amd64.tar.gz  \
   && apk del wget
 
 export GOROOT=/usr/lib/go
@@ -19,10 +18,10 @@ export GOPATH=/gopath
 export GOBIN=/gopath/bin
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-cd /gopath/src/github.com/Dataman-Cloud/HAServer
-go build -o HAServer && \
-mkdir -p /var/haserver && \
-cp /gopath/src/github.com/Dataman-Cloud/HAServer/HAServer /var/haserver/HAServer && \
+cd /gopath/src/github.com/Dataman-Cloud/omega-haproxyctl
+go build -o omega-haproxyctl && \
+mkdir -p /var/omega-haproxyctl && \
+cp /gopath/src/github.com/Dataman-Cloud/omega-haproxyctl/omega-haproxyctl /var/omega-haproxyctl/omega-haproxyctl && \
 mkdir -p /run/haproxy && \
 mkdir -p /var/log/supervisor &&\
 cd /
