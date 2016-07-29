@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -31,7 +33,7 @@ var (
 func init() {
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
 	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
-	reloadChan = make(chan int, 3)
+	reloadChan = make(chan int)
 }
 
 type Response struct {
@@ -136,14 +138,8 @@ func updateWeight(w http.ResponseWriter, r *http.Request) {
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
-	if len(reloadChan) < 3 {
-		reloadChan <- 1
-		responseJSON(w, Response{Code: 0, Err: ""})
-		return
-	}
-
-	log.Println("HAProxy reload queue is fully, ignore this message")
-	responseJSON(w, Response{Code: 0, Err: "reloading, ignore message"})
+	reloadChan <- 1
+	responseJSON(w, Response{Code: 0, Err: ""})
 }
 
 func ReloadHaproxyConfig(conf *configuration.Configuration) {
@@ -168,8 +164,55 @@ func validateConfig(conf *configuration.Configuration) error {
 	return nil
 }
 
+// contentNotChanged compare two file's content equal or not
+func contentNotChanged(origin string, backup string) bool {
+	org, err := ioutil.ReadFile(origin)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	bak, _err := ioutil.ReadFile(backup)
+	if os.IsNotExist(_err) {
+		return false
+	}
+
+	return bytes.Equal(org, bak)
+}
+
+// backupConfigFile backup haproxy's config file
+func backupConfigFile(origin string, backup string) (n int64, err error) {
+	src, err := os.Open(origin)
+	if err != nil {
+		return 0, err
+	}
+	defer src.Close()
+
+	dst, _err := os.OpenFile(backup, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if _err != nil {
+		return 0, _err
+	}
+	defer dst.Close()
+
+	return io.Copy(dst, src)
+}
+
 // reload and update haproxy config
 func reloadConfig(conf *configuration.Configuration) (bool, error) {
+
+	const (
+		SourceFile = "/etc/haproxy/haproxy.cfg"
+		BackupFile = "/etc/haproxy/haproxy.cfg.bak"
+	)
+
+	//
+	// Compare the config file and the backup file to make sure
+	// the config file has really changed.
+	//
+	notchanged := contentNotChanged(SourceFile, BackupFile)
+	if notchanged {
+		return true, nil // config file content not changed.
+	}
+
 	// delete drop tcp sync message
 	defer func() {
 		log.Println("After reload")
@@ -193,6 +236,11 @@ func reloadConfig(conf *configuration.Configuration) (bool, error) {
 	if err := execCommand(conf.HAProxy.ReloadCommand); err != nil {
 		log.Println("Reload config Error: ", err.Error())
 		return false, err
+	}
+
+	log.Println("Backup config")
+	if _, err := backupConfigFile(SourceFile, BackupFile); err != nil {
+		log.Fatalf("ERROR: backup config failed %s", err)
 	}
 
 	return true, nil
