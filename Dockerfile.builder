@@ -6,7 +6,8 @@ RUN mkdir -p /config /etc/default_haproxy
 COPY config/production.json /config/production.json
 COPY config/default_haproxy.cfg /etc/default_haproxy/default_haproxy.cfg
 
-COPY . /gopath/src/github.com/Dataman-Cloud/HAServer
+COPY . /gopath/src/github.com/Dataman-Cloud/omega-haproxyctl
+COPY s6/s6-overlay-amd64.tar.gz /tmp/s6-overlay-amd64.tar.gz
 COPY files /usr/share/haproxy
 COPY builder/buildHAServer.sh /buildHAServer.sh
 WORKDIR /

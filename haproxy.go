@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -12,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Dataman-Cloud/HAServer/cmd"
-	"github.com/Dataman-Cloud/HAServer/configuration"
+	"github.com/Dataman-Cloud/omega-haproxyctl/cmd"
+	"github.com/Dataman-Cloud/omega-haproxyctl/configuration"
 	"github.com/go-martini/martini"
 	"github.com/natefinch/lumberjack"
 )
@@ -24,6 +26,7 @@ import (
 var (
 	logPath        string
 	serverBindPort string
+	configFilePath string
 	runtime        cmd.Runtime
 	reloadChan     chan int
 )
@@ -31,7 +34,9 @@ var (
 func init() {
 	flag.StringVar(&logPath, "log", "", "Log path to a file. Default logs to stdout")
 	flag.StringVar(&serverBindPort, "bind", ":5004", "Bind HTTP server to a specific port")
-	reloadChan = make(chan int, 3)
+	flag.StringVar(&configFilePath, "config", "/config/production.json", "Full path of the configuration JSON file")
+
+	reloadChan = make(chan int)
 }
 
 type Response struct {
@@ -44,6 +49,7 @@ func main() {
 	configureLog()
 
 	// Load configuration
+	configuration.Init(configFilePath)
 	conf := configuration.Configs()
 	runtime = cmd.Runtime{
 		Binary:   conf.HAProxy.Command,
@@ -136,14 +142,8 @@ func updateWeight(w http.ResponseWriter, r *http.Request) {
 }
 
 func servicesApi(w http.ResponseWriter, r *http.Request) {
-	if len(reloadChan) < 3 {
-		reloadChan <- 1
-		responseJSON(w, Response{Code: 0, Err: ""})
-		return
-	}
-
-	log.Println("HAProxy reload queue is fully, ignore this message")
-	responseJSON(w, Response{Code: 0, Err: "reloading, ignore message"})
+	reloadChan <- 1
+	responseJSON(w, Response{Code: 0, Err: ""})
 }
 
 func ReloadHaproxyConfig(conf *configuration.Configuration) {
@@ -168,31 +168,81 @@ func validateConfig(conf *configuration.Configuration) error {
 	return nil
 }
 
+// contentChanged compare two file's content equal or not
+func contentChanged(origin string, backup string) bool {
+	o, err := ioutil.ReadFile(origin)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	bak, err := ioutil.ReadFile(backup)
+	if os.IsNotExist(err) {
+		return true
+	}
+
+	return !bytes.Equal(o, bak)
+}
+
+// backupConfigFile backup haproxy's config file
+func backupConfigFile(origin string, backup string) (n int64, err error) {
+	src, err := os.Open(origin)
+	if err != nil {
+		return 0, err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(backup, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer dst.Close()
+
+	return io.Copy(dst, src)
+}
+
 // reload and update haproxy config
 func reloadConfig(conf *configuration.Configuration) (bool, error) {
-	// delete drop tcp sync message
-	defer func() {
-		log.Println("After reload")
-		if err := execCommand(conf.HAProxy.AfterReload); err != nil {
-			log.Println("WARN: AfterReload Command got error: ", err.Error())
+
+	const (
+		SourceFile = "/etc/haproxy/haproxy.cfg"
+		BackupFile = "/tmp/haproxy.cfg.bak"
+	)
+
+	//
+	// Compare the config file and the backup file to make sure
+	// the config file has really changed.
+	//
+	changed := contentChanged(SourceFile, BackupFile)
+	if changed {
+		// delete drop tcp sync message
+		defer func() {
+			log.Println("After reload")
+			if err := execCommand(conf.HAProxy.AfterReload); err != nil {
+				log.Println("WARN: AfterReload Command got error: ", err.Error())
+			}
+		}()
+
+		err := validateConfig(conf)
+		if err != nil {
+			return false, err
 		}
-	}()
 
-	err := validateConfig(conf)
-	if err != nil {
-		return false, err
-	}
+		log.Println("Before reload")
+		// add drop tcp sync message
+		if err := execCommand(conf.HAProxy.BeforeReload); err != nil {
+			log.Println("WARN: BeforeReload Command got error: ", err.Error())
+		}
 
-	log.Println("Before reload")
-	// add drop tcp sync message
-	if err := execCommand(conf.HAProxy.BeforeReload); err != nil {
-		log.Println("WARN: BeforeReload Command got error: ", err.Error())
-	}
+		log.Println("Reload config")
+		if err := execCommand(conf.HAProxy.ReloadCommand); err != nil {
+			log.Println("Reload config Error: ", err.Error())
+			return false, err
+		}
 
-	log.Println("Reload config")
-	if err := execCommand(conf.HAProxy.ReloadCommand); err != nil {
-		log.Println("Reload config Error: ", err.Error())
-		return false, err
+		log.Println("Backup config")
+		if _, err := backupConfigFile(SourceFile, BackupFile); err != nil {
+			log.Fatalf("ERROR: backup config failed %s", err)
+		}
 	}
 
 	return true, nil
