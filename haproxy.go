@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,6 +30,11 @@ var (
 	configFilePath string
 	runtime        cmd.Runtime
 	reloadChan     chan int
+)
+
+const (
+	HaproxyDefaultPort    = 5091
+	DefaultRequestTimeout = 5 * time.Second
 )
 
 func init() {
@@ -95,14 +101,14 @@ func initServer(conf *configuration.Configuration) {
 }
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	conf := configuration.Configs()
-	if err := validateConfig(&conf); err != nil {
-		log.Println("validateConfig got error: ", err)
-		http.Error(w, "Failed to validate haproxy config", http.StatusInternalServerError)
+	client := http.Client{Timeout: DefaultRequestTimeout}
+	_, err := client.Head(fmt.Sprintf("http://0.0.0.0:%d", HaproxyDefaultPort))
+	if err != nil {
+		log.Println("Check haproxy running failed: %s", err)
+		http.Error(w, "haproxy checking failed", http.StatusInternalServerError)
 		return
 	}
-
-	io.WriteString(w, "Successed to validate haproxy.cfg")
+	io.WriteString(w, "haproxy checking succeed")
 	return
 }
 

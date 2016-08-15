@@ -1,3 +1,4 @@
 #!/usr/bin/with-contenv sh
 
+/usr/local/sbin/haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -D
 /var/omega-haproxyctl/omega-haproxyctl -bind="${BIND:-:5004}" -config=${CONFIG_PATH:-/config/production.json}
