@@ -8,10 +8,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -108,7 +110,25 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "haproxy checking failed", http.StatusInternalServerError)
 		return
 	}
+	conn, err := net.Dial("unix", "/run/haproxy/admin.sock")
+	if err != nil {
+		http.Error(w, "haproxy checking failed", http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Fprintf(conn, "show info\n")
+	b, err := ioutil.ReadAll(conn)
+	if err != nil {
+		http.Error(w, "haproxy checking failed", http.StatusInternalServerError)
+		return
+	}
+	if !strings.Contains(string(b), "Version") {
+		http.Error(w, "haproxy checking failed", http.StatusInternalServerError)
+		return
+	}
 	io.WriteString(w, "haproxy checking succeed")
+
 	return
 }
 
